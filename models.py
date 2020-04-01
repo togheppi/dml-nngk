@@ -17,7 +17,7 @@ class Classifier(tf.keras.Model):
                                          input_shape=(params['image_size'], params['image_size'], 3),
                                          pooling='avg')
         self.feat_dim = self.feature_extractor.output_shape[-1]
-        self.fcw = tf.keras.layers.Dense(1, kernel_initializer='he_normal', activation='sigmoid', use_bias=False)
+        self.fcw = tf.keras.layers.Dense(params['num_neighbors']-1, kernel_initializer='he_normal', activation='sigmoid', use_bias=False)
 
     def call(self, inputs, training=None, mask=None):
         features = self.feature_extractor(inputs)
@@ -26,7 +26,8 @@ class Classifier(tf.keras.Model):
         if self.params['use_weights']:
             w = self.fcw(features)
             out["w"] = w
-
+        else:
+            out["w"] = tf.ones_like(self.params['num_neighbors']-1)
         return out
 
 

@@ -11,7 +11,6 @@ parser.add_argument("--train_dir", default='./imgs/bns', type=str)
 parser.add_argument("--num_samples", default=20, type=int)
 parser.add_argument("--image_size", default=224, type=int)
 parser.add_argument("--embedding_dim", default=2048, type=int)
-parser.add_argument("--num_classes", default=2, type=int)
 parser.add_argument("--num_neighbors", default=5, type=int)
 parser.add_argument("--global_scale", default=20.0, type=float)
 parser.add_argument("--num_epochs", default=6, type=int)
@@ -60,7 +59,7 @@ def update_centres(model, init_ds, storage, epoch, k=5):
     return storage, neighbor_ids
 
 
-def nca_loss(data, model, optimizer, storage, neighbor_ids, args):
+def train_step(data, model, optimizer, storage, neighbor_ids, args):
     # data
     images, labels, ids = data
 
@@ -68,11 +67,7 @@ def nca_loss(data, model, optimizer, storage, neighbor_ids, args):
         # forward pass
         outs = model(images, training=True)
         outs_z = outs["z"]
-
-        if args['use_weights']:
-            outs_w = outs["w"]
-        else:
-            outs_w = tf.ones_like(labels)
+        outs_w = outs["w"]
 
         # get indices, centres, labels of nearest neighbors
         nn_ids = neighbor_ids[ids.numpy()][:, 1:]  # exclude input sample itself from neighbor list
@@ -81,9 +76,8 @@ def nca_loss(data, model, optimizer, storage, neighbor_ids, args):
 
         # compute nca loss
         loss = 0.0
-        for i, (out_z, l, nn_c, nn_l) in enumerate(zip(outs_z, labels, nn_centres, nn_labels)):
-            p = get_class_probs(out_z, nn_c, nn_l, outs_w, args)
-            loss += loss_fn(p, l, args['num_classes'])
+        for i, (out_z, l, nn_c, nn_l, out_w) in enumerate(zip(outs_z, labels, nn_centres, nn_labels, outs_w)):
+            loss += get_nca_loss(out_z, l, nn_c, nn_l, out_w, args)
 
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
@@ -102,7 +96,7 @@ if __name__ == "__main__":
     init_ds = get_dataset(args['train_dir'], batch_size=args['batch_size'], epochs=1, shuffle=False)
     storage = {
         'centres': np.zeros((args['num_samples'], args['embedding_dim']), dtype=np.float32),
-        'labels': np.zeros((args['num_samples'],), dtype=np.int32),
+        'labels': np.zeros((args['num_samples']), dtype=np.int32),
     }
     neighbor_ids = np.zeros((args['num_samples'], args['num_neighbors']), dtype=np.int32)
 
@@ -122,10 +116,10 @@ if __name__ == "__main__":
         # Update gaussian centres & k-nearest neighbor list
         if step == 0 or step % c_update_interval_iter == 0:
             storage, neighbor_ids = update_centres(model, init_ds, storage, epoch, k=args['num_neighbors'])
-            print("Updating centres & neighbor list..\n".format(epoch))
+            print("Updating centres & neighbor list..".format(epoch))
 
-        # Compute nca loss
-        loss = nca_loss(data, model, optimizer, storage, neighbor_ids, args)
+        # Train step
+        loss = train_step(data, model, optimizer, storage, neighbor_ids, args)
 
         print('Epoch: [{}/{}], Loss: {:.4f}'.format(epoch + 1, args['num_epochs'], loss))
 
