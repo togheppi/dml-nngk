@@ -7,16 +7,16 @@ from dataset import get_dataset
 import hnswlib
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--train_dir", default='./imgs/bns', type=str)
-parser.add_argument("--num_samples", default=20, type=int)
+parser.add_argument("--train_dir", default='D:/Data/celeba/sort_by_id', type=str)
+parser.add_argument("--num_samples", default=100, type=int)
 parser.add_argument("--image_size", default=224, type=int)
 parser.add_argument("--embedding_dim", default=2048, type=int)
 parser.add_argument("--num_neighbors", default=5, type=int)
 parser.add_argument("--global_scale", default=20.0, type=float)
-parser.add_argument("--num_epochs", default=6, type=int)
-parser.add_argument("--batch_size", default=4, type=int)
+parser.add_argument("--num_epochs", default=5, type=int)
+parser.add_argument("--batch_size", default=8, type=int)
 parser.add_argument("--lr", default=1e-5, type=float)
-parser.add_argument("--c_update_interval_epoch", default=2, type=int)
+parser.add_argument("--c_update_interval_epoch", default=1, type=int)
 parser.add_argument("--use_weights", default=True, type=bool)
 
 
