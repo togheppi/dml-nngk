@@ -1,5 +1,6 @@
 import tensorflow as tf
 from keras_vggface.models import *
+from resnet_models import resnet
 
 
 def preprocess_senet50(x, mean=(91.4953, 103.8827, 131.0912)):
@@ -17,37 +18,41 @@ class Classifier(tf.keras.Model):
                                          input_shape=(params['image_size'], params['image_size'], 3),
                                          pooling='avg')
         self.feat_dim = self.feature_extractor.output_shape[-1]
-        self.fcw = tf.keras.layers.Dense(params['num_neighbors']-1, kernel_initializer='he_normal', activation='sigmoid', use_bias=False)
+        # self.fcw = tf.keras.layers.Dense(params['num_neighbors']-1, kernel_initializer='he_normal', activation='sigmoid', use_bias=False)
+        w_init = tf.random.uniform(shape=(params['batch_size'], params['num_neighbors']-1), maxval=1.0)
+        self.w = tf.Variable(w_init, name='w', trainable=True)
+
+    def call(self, inputs, training=None, mask=None):
+        x = self.preprocess(inputs)
+        features = self.feature_extractor(x)
+        out = {"z": features}
+
+        if self.params['use_weights']:
+            # w = self.fcw(features)
+            out["w"] = tf.nn.softmax(self.w, axis=1)
+        else:
+            out["w"] = tf.ones((out["z"].shape[0], self.params['num_neighbors']-1))
+        return out
+
+
+class resnet18(tf.keras.Model):
+    def __init__(self, params, **kwargs):
+        super(resnet18, self).__init__(**kwargs)
+        self.params = params
+        self.base_model = resnet.resnet_18(res=params['image_size'])
+        self.feature_extractor = tf.keras.Model(self.base_model.input, self.base_model.layers[1].output)
+        self.feat_dim = self.feature_extractor.output_shape[-1]
+        # self.fcw = tf.keras.layers.Dense(params['num_neighbors']-1, kernel_initializer='he_normal', activation='sigmoid', use_bias=False)
+        w_init = tf.random.uniform(shape=(params['batch_size'], params['num_neighbors']-1), maxval=1.0)
+        self.w = tf.Variable(w_init, name='w', trainable=True)
 
     def call(self, inputs, training=None, mask=None):
         features = self.feature_extractor(inputs)
         out = {"z": features}
 
         if self.params['use_weights']:
-            w = self.fcw(features)
-            out["w"] = w
+            # w = self.fcw(features)
+            out["w"] = tf.nn.softmax(self.w, axis=1)
         else:
-            out["w"] = tf.ones_like(self.params['num_neighbors']-1)
-        return out
-
-
-class Net(tf.keras.Model):
-    def __init__(self, params):
-        super(Net, self).__init__()
-        self.params = params
-        self.inputs = tf.keras.layers.Input((None, params['num_samples']))
-        self.fc1 = tf.keras.layers.Dense(params['embedding_dim'], kernel_initializer='he_normal', use_bias=False)
-        self.fc2 = tf.keras.layers.Dense(params['embedding_dim'], kernel_initializer='he_normal', use_bias=False)
-        self.fcw = tf.keras.layers.Dense(1, kernel_initializer='he_normal', use_bias=False)
-
-    def call(self, inputs, training=None, mask=None):
-        x = tf.keras.layers.ReLU()(self.fc1(inputs))
-        z = tf.keras.layers.ReLU()(self.fc2(x))
-
-        out = {"z": z}
-
-        if self.params['use_weights']:
-            w = self.fcw(x)
-            out["w"] = w
-
+            out["w"] = tf.ones((out["z"].shape[0], self.params['num_neighbors']-1))
         return out

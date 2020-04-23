@@ -11,7 +11,7 @@ def parse_img_fn(file_path, res=224):
     img = tf.image.resize(img, [res, res])
     img = tf.image.random_flip_left_right(img)
 
-    fn = tf.strings.split(file_path, '\\')[-1]
+    fn = tf.strings.split(file_path, '/')[-1]
     idx_str = tf.strings.split(fn, '.')[0]
     idx = tf.strings.to_number(idx_str, tf.dtypes.int32)
 
@@ -25,7 +25,7 @@ def parse_img_fn(file_path, res=224):
     # else:
     #     label = tf.ones_like(1)
 
-    label = tf.strings.split(file_path, '\\')[-2]
+    label = tf.strings.to_number(tf.strings.split(file_path, '/')[-2], tf.dtypes.int32)
     return img, label, idx, file_path
 
 
@@ -54,7 +54,7 @@ def test_input_fn(img_base_dir):
 
 
 def main():
-    img_base_dir = 'D:/Data/CelebAMask-HQ/sample'
+    img_base_dir = '/mnt/vision-nas/minjae/data-sets/celeba/sort_by_id'
     test_input_fn(img_base_dir)
     return
 
