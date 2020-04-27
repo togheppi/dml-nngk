@@ -6,47 +6,47 @@ import cv2
 
 base_dir = '/mnt/vision-nas/data-sets/celeba/'
 img_dir = os.path.join(base_dir, 'img_align_celeba')
-save_base_dir = '../Data/celeba'
-id_file = 'identity_CelebA.txt'
+save_base_dir = 'D:/Data/celeba'
 ld_file = 'list_landmarks_align_celeba.txt'
+id_file = 'identity_CelebA.txt'
+img_size = 256
 
-fp = open(id_file, 'r')
-lines = fp.readlines()
-# fn_list = [x.split(' ')[0] for x in lines]
-id_list = [x.split(' ')[1].rstrip("\n") for x in lines]
-
+# filename and landmarks
 ld_fp = open(ld_file, 'r')
 ld_lines = ld_fp.readlines()[2:]
+fn_list = [x.split(' ')[0] for x in ld_lines]
+ld_list = [x.split('.jpg')[-1].rstrip().split('  ') for x in ld_lines]
 
+# identity
+id_fp = open(id_file, 'r')
+id_lines = id_fp.readlines()
+id_list = [x.split(' ')[1].rstrip("\n") for x in id_lines]
 
+# top n-most frequent id
 ctr = collections.Counter(id_list)
 top_id_list = [x[0] for x in ctr.most_common(3300)]
 
-# top_img_list = [x.split(' ')[0] for x in lines if x.split(' ')[1].rstrip("\n") in top_id_list]
+# data list
+data_list = [(fn, ld, id) for fn, ld, id in zip(fn_list, ld_list, id_list) if id in top_id_list]
 
-cnt = 0
-for i, (line, ld_line) in enumerate(zip(lines, ld_lines)):
-    fn = line.split(' ')[0]
-    id = line.split(' ')[1].rstrip("\n")
-    ld_list = ld_lines[0].split('.jpg')[-1].rstrip().split('  ')
-    face_landmarks = [[ld_list[0], ld_list[1]],
-                      [ld_list[2], ld_list[3]],
-                      [ld_list[6], ld_list[7]],
-                      [ld_list[8], ld_list[9]]]
+for i, (fn, ld, id) in enumerate(data_list):
+    # 4-point landmarks (left eye, right eye, left mouth, right mouth)
+    face_landmarks = [[ld[0], ld[1]],
+                      [ld[2], ld[3]],
+                      [ld[6], ld[7]],
+                      [ld[8], ld[9]]]
 
-    if id in top_id_list:
-        save_dir = os.path.join(save_base_dir, 'sort_by_id_aligned', id)
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+    # FFHQ align
+    image = cv2.imread(os.path.join(img_dir, fn))
+    aligned_image = image_align(image, face_landmarks,
+                                output_size=img_size, transform_size=img_size*4,
+                                enable_padding=True)
 
-        # FFHQ align
-        image = cv2.imread(os.path.join(img_dir, fn))
-        aligned_image = image_align(image, face_landmarks,
-                                    output_size=256, transform_size=1024,
-                                    enable_padding=True)
+    # save
+    save_dir = os.path.join(save_base_dir, 'sort_by_id_aligned', id)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    cv2.imwrite(os.path.join(save_dir, '{}.png'.format(i)), aligned_image)
 
-        cv2.imwrite(os.path.join(save_dir, '{}.png'.format(cnt)), aligned_image)
-        # shutil.copy(os.path.join(img_dir, fn), os.path.join(save_dir, '{}.png'.format(cnt)))
-        cnt += 1
-        print('[{}/{}] {}th file for id: {}'.format(i+1, len(lines), cnt, id))
+    print('[{}/{}] save {} for id: {}'.format(i+1, len(data_list), fn, id))
 print('done')
